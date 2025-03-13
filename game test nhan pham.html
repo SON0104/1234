@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trò chơi Bingo</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            padding: 20px;
+        }
+        
+        .score-container {
+            margin-bottom: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #4b0082;
+        }
+        
+        h1 {
+            color: #4b0082;
+            margin-bottom: 20px;
+        }
+        
+        .game-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .cell {
+            width: 100%;
+            aspect-ratio: 1;
+            background-color: #8a2be2;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .cell:hover {
+            background-color: #9932cc;
+            transform: scale(1.05);
+        }
+        
+        .cell.checked {
+            background-color: #dda0dd;
+            cursor: not-allowed;
+        }
+        
+        .cell.prize {
+            background-color: #ffd700;
+            color: #8a2be2;
+        }
+        
+        .message {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4b0082;
+            margin: 20px 0;
+            height: 40px;
+        }
+        
+        .restart-btn {
+            background-color: #4b0082;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        
+        .restart-btn:hover {
+            background-color: #8a2be2;
+        }
+        
+        .celebration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+        
+        .celebration-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            animation: pop 0.5s ease;
+        }
+        
+        @keyframes pop {
+            0% { transform: scale(0); }
+            70% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 20px;
+            background-color: #ffd700;
+            animation: confetti-fall 4s ease-in-out infinite;
+        }
+        
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(1000px) rotate(360deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>Trò chơi Bingo</h1>
+        <div class="score-container">
+            Điểm nhân phẩm: <span id="score">5</span>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="message" id="message">Hãy tìm phần thưởng ẩn!</div>
+        <button class="restart-btn" id="restartBtn">Chơi lại</button>
+    </div>
+    
+    <div class="celebration" id="celebration">
+        <div class="celebration-content">
+            <h2>Chúc mừng!</h2>
+            <p>Bạn đã tìm thấy phần thưởng!</p>
+            <p>Số điểm còn lại: <span id="finalScore">0</span></p>
+            <button class="restart-btn" onclick="restartGame()">Chơi lại</button>
+        </div>
+    </div>
+    
+    <div class="celebration" id="gameOver" style="display: none;">
+        <div class="celebration-content" style="background-color: #ffcccc;">
+            <h2>Game Over!</h2>
+            <p>Bạn đã hết điểm nhân phẩm!</p>
+            <button class="restart-btn" onclick="restartGame()">Chơi lại</button>
+        </div>
+    </div>
+    
+    <div class="confetti" id="confetti"></div>
+    
+    <audio id="applauseSound" src="https://cdnjs.cloudflare.com/ajax/libs/soundjs/1.0.1/soundjs.min.js"></audio>
+    
+    <script>
+        // Biến lưu trữ vị trí phần thưởng
+        let prizePosition;
+        let attempts = 0;
+        let gameOver = false;
+        let score = 5; // Điểm nhân phẩm ban đầu
+        
+        // Hàm khởi tạo trò chơi
+        function initGame() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            
+            // Tạo phần thưởng ngẫu nhiên (0-8)
+            prizePosition = Math.floor(Math.random() * 9);
+            gameOver = false;
+            attempts = 0;
+            score = 5; // Reset điểm nhân phẩm
+            
+            // Cập nhật hiển thị điểm
+            document.getElementById('score').textContent = score;
+            
+            // Tạo 9 ô
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.setAttribute('data-index', i);
+                cell.textContent = '?';
+                cell.addEventListener('click', checkCell);
+                grid.appendChild(cell);
+            }
+            
+            // Cập nhật thông báo
+            document.getElementById('message').textContent = 'Hãy tìm phần thưởng ẩn!';
+            
+            // Ẩn thông báo game over nếu có
+            document.getElementById('gameOver').style.display = 'none';
+        }
+        
+        // Hàm kiểm tra ô được chọn
+        function checkCell(e) {
+            if (gameOver) return;
+            
+            const cell = e.target;
+            const index = parseInt(cell.getAttribute('data-index'));
+            
+            // Nếu ô đã được kiểm tra rồi thì bỏ qua
+            if (cell.classList.contains('checked')) return;
+            
+            // Đánh dấu ô đã chọn
+            cell.classList.add('checked');
+            
+            if (index === prizePosition) {
+                // Tìm thấy phần thưởng
+                cell.classList.add('prize');
+                cell.textContent = '🎁';
+                
+                // Hiện thông báo chúc mừng
+                document.getElementById('message').textContent = 'Chúc mừng! Bạn đã tìm thấy phần thưởng!';
+                
+                // Cập nhật điểm cuối cùng cho popup chúc mừng
+                document.getElementById('finalScore').textContent = score;
+                
+                // Hiệu ứng chúc mừng
+                showCelebration();
+                
+                // Phát âm thanh vỗ tay
+                playApplause();
+                
+                gameOver = true;
+            } else {
+                // Mất lượt và trừ điểm
+                cell.textContent = '❌';
+                attempts++;
+                
+                // Trừ điểm nhân phẩm
+                score--;
+                document.getElementById('score').textContent = score;
+                
+                // Kiểm tra nếu hết điểm
+                if (score <= 0) {
+                    gameOver = true;
+                    document.getElementById('message').textContent = 'Game Over! Bạn đã hết điểm nhân phẩm!';
+                    document.getElementById('gameOver').style.display = 'flex';
+                } else {
+                    // Cập nhật thông báo
+                    document.getElementById('message').textContent = `Mất lượt. Còn ${score} điểm nhân phẩm!`;
+                }
+            }
+        }
+        
+        // Hàm hiển thị hiệu ứng chúc mừng
+        function showCelebration() {
+            // Hiện popup chúc mừng
+            document.getElementById('celebration').style.display = 'flex';
+            
+            // Tạo hiệu ứng confetti
+            const confettiContainer = document.getElementById('confetti');
+            confettiContainer.innerHTML = '';
+            
+            for (let i = 0; i < 100; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti-piece';
+                confetti.style.left = Math.random() * 100 + '%';
+                confetti.style.animationDelay = Math.random() * 4 + 's';
+                confetti.style.backgroundColor = getRandomColor();
+                confettiContainer.appendChild(confetti);
+            }
+        }
+        
+        // Hàm tạo màu ngẫu nhiên
+        function getRandomColor() {
+            const colors = ['#ffd700', '#ff6347', '#9932cc', '#32cd32', '#4169e1', '#ff69b4'];
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+        
+        // Hàm phát âm thanh vỗ tay
+        function playApplause() {
+            // Tạo âm thanh vỗ tay bằng AudioContext
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const gainNode = audioContext.createGain();
+            gainNode.connect(audioContext.destination);
+            
+            // Tạo âm thanh vỗ tay đơn giản (nhiều tiếng vỗ tay ngắn)
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const oscillator = audioContext.createOscillator();
+                    oscillator.type = 'triangle';
+                    oscillator.frequency.value = 300 + Math.random() * 200;
+                    
+                    const gain = audioContext.createGain();
+                    gain.gain.value = 0.2;
+                    gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.1);
+                    
+                    oscillator.connect(gain);
+                    gain.connect(audioContext.destination);
+                    
+                    oscillator.start();
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                }, i * 80 + Math.random() * 50);
+            }
+        }
+        
+        // Hàm chơi lại
+        function restartGame() {
+            document.getElementById('celebration').style.display = 'none';
+            // Xóa hiệu ứng confetti cũ
+            document.getElementById('confetti').innerHTML = '';
+            initGame();
+        }
+        
+        // Khởi tạo trò chơi khi tải trang
+        window.onload = function() {
+            initGame();
+            document.getElementById('restartBtn').addEventListener('click', restartGame);
+        };
+    </script>
+</body>
+</html>
